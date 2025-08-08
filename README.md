@@ -1,26 +1,41 @@
-# FFmpeg Dropbox Audio Split API
+# FFmpeg Dropbox Audio Split API (Railway-ready)
 
-This is a simple Flask API to split audio files from Dropbox using ffmpeg.
+A minimal Flask API that downloads an audio file from a Dropbox share link and splits it into fixed-length segments using ffmpeg.
 
-## 🧪 How it works
+## Deploy to Railway (Free)
 
-- Accepts a Dropbox share link
-- Downloads the file
-- Splits it into 60-second segments using ffmpeg
-- Returns a list of split files
+1. Push this folder to your GitHub repo (e.g., `ffmpeg-dropbox-api-railway`)
+2. Create a New Project on https://railway.app → Deploy from GitHub
+3. It will auto-install `ffmpeg` via `nixpacks.toml` and run `python app.py`
+4. After deploy, open `https://<your-app>.up.railway.app/` to see health JSON
 
-## 🛠 Deploy to Railway
+> If you prefer Gunicorn: set Start Command to `gunicorn app:app --bind 0.0.0.0:$PORT`
 
-[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/template/oPuGyN?referrer=chatgpt)
+## Health Check
 
-## Example Request
-
+GET `/` → should return:
+```json
+{"ok": true, "service": "ffmpeg-dropbox-api", "endpoints": ["/split-audio"]}
 ```
-POST /split-audio
-Content-Type: application/json
 
+## API
+
+POST `/split-audio`
+```json
 {
-  "url": "https://www.dropbox.com/s/xxxxx/meeting.wav?dl=0",
-  "segment_time": 60
+  "url": "https://www.dropbox.com/s/<id>/meeting.wav?dl=0",
+  "segment_time": 60,
+  "format": "wav" // optional, wav/mp3/m4a
 }
 ```
+
+### cURL
+```bash
+curl -X POST https://<your-app>.up.railway.app/split-audio   -H "Content-Type: application/json"   -d '{ "url": "https://www.dropbox.com/s/xxxxx/meeting.wav?dl=0", "segment_time": 60 }'
+```
+
+## Notes
+
+- Uses `/tmp` for working files. Railway ephemeral storage is fine for short jobs.
+- If stream copy fails, it falls back to re-encode for compatibility.
+- Next step: in Make.com, call this API, then upload `/tmp/splits_*` files to Dropbox and continue to Whisper → merge → summarize → LINE.
