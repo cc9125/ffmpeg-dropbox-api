@@ -14,12 +14,11 @@ def split_audio():
     data = request.get_json(silent=True) or {}
     dropbox_url = data.get('url')
     segment_time = int(data.get('segment_time', 60))
-    output_format = data.get('format', 'wav')  # wav/mp3/m4a, etc.
+    output_format = data.get('format', 'wav')
 
     if not dropbox_url or "dropbox.com" not in dropbox_url:
         return jsonify({"error": "Missing or invalid Dropbox share URL"}), 400
 
-    # Convert Dropbox share URL to direct download URL
     dl_url = dropbox_url.replace("www.dropbox.com", "dl.dropboxusercontent.com").replace("?dl=0", "")
 
     work_id = uuid.uuid4().hex
@@ -27,23 +26,20 @@ def split_audio():
     output_dir = f"/tmp/splits_{work_id}"
     os.makedirs(output_dir, exist_ok=True)
 
-    # Download file from Dropbox
     try:
         subprocess.run(["curl", "-L", dl_url, "-o", input_path], check=True)
     except subprocess.CalledProcessError as e:
         return jsonify({"error": "Failed to download from Dropbox", "detail": str(e)}), 500
 
-    # Probe to detect audio stream and ensure readable by ffmpeg
     try:
-        subprocess.run(["ffprobe", "-v", "error", "-show_format", "-show_streams", input_path], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
+        subprocess.run(["ffprobe", "-v", "error", "-show_format", "-show_streams", input_path],
+                       check=True, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
     except subprocess.CalledProcessError:
         return jsonify({"error": "ffprobe could not read the input file"}), 400
 
-    # Ensure extension for output pattern
     ext = output_format.lower().strip(".")
     output_pattern = os.path.join(output_dir, f"segment-%03d.{ext}")
 
-    # Try stream copy (fast). If fails, fallback to re-encode.
     def split_with_cmd(cmd):
         try:
             subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -73,12 +69,7 @@ def split_audio():
 
     files = sorted(os.listdir(output_dir))
     segments = [f for f in files if f.startswith("segment-")]
-    payload = {
-        "status": "success",
-        "count": len(segments),
-        "segments": segments,
-        "work_dir": output_dir
-    }
+    payload = {"status": "success", "count": len(segments), "segments": segments, "work_dir": output_dir}
 
     try:
         os.remove(input_path)
